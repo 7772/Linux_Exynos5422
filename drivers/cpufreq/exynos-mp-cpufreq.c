@@ -697,7 +697,7 @@ static int exynos_target(struct cpufreq_policy *policy,
 		target_freq = max((unsigned int)pm_qos_request(PM_QOS_KFC_FREQ_MIN), target_freq);
 		target_freq = min((unsigned int)pm_qos_request(PM_QOS_KFC_FREQ_MAX), target_freq);
 		target_freq = min(g_clamp_cpufreqs[CA7], target_freq);
-	} 
+	}
 */
 
 #ifdef CONFIG_CPU_THERMAL_IPA_DEBUG
@@ -1188,39 +1188,72 @@ static ssize_t store_cpufreq_max_limit(struct kobject *kobj, struct attribute *a
 	if (!sscanf(buf, "%d", &cpu_input))
 		return -EINVAL;
 
+
+//cpu_input 이 freq_min[CA15] 이상이면,
 	if (cpu_input >= (int)freq_min[CA15]) {
+
+
+		//egl_hotplugged true 이면,
 		if (egl_hotplugged) {
+			//big_cores_hotplug에 false 를 전달하여 리턴값이 참이면,
 			if (big_cores_hotplug(false))
+				// 에러메시지 출력.
 				pr_err("%s: failed big cores hotplug in\n",
 							__func__);
+			//big_cores_hotplug에 false 를 전달하여 리턴값이 false 면,
 			else
+				//egl_hotplugged 는 false.
 				egl_hotplugged = false;
 		}
 
-		cpu_input = max(cpu_input, (int)freq_min[CA15]);
+		// cpu_input과  freq_min[CA15] 중 큰 값을 cpu_input 에 저장.. cpu_input 값이 변하는지 의문.
+	  cpu_input = max(cpu_input, (int)freq_min[CA15]);
 		kfc_input = max_kfc_qos_const.default_value;
-	} else if (cpu_input < (int)freq_min[CA15]) {
+
+//cpu_input 이 freq_min[CA15] 보다 작으면,
+	}
+	else if (cpu_input < (int)freq_min[CA15]) {
+		// cpu_input 이 음수이면
 		if (cpu_input < 0) {
+			// egl_hotplugged 가 true 이면,
 			if (egl_hotplugged) {
+				//big_cores_hotplug에 false 를 전달하여 리턴값이 참이면,
 				if (big_cores_hotplug(false))
+					// 에러메시지 출력.
 					pr_err("%s: failed big cores hotplug in\n",
 							__func__);
+				//big_cores_hotplug 에 false 를 전달하여 리턴값이 false 면,
 				else
+					// egl_hotplugged 는 false.
 					egl_hotplugged = false;
 			}
 
+
+// ----여기까지 egl_hotplugged 가 모두 false 인 경우.
+
+
+			//cpu_input, kfc_input 값 다시 설정.
 			cpu_input = max_cpu_qos_const.default_value;
 			kfc_input = max_kfc_qos_const.default_value;
-		} else {
+		}
+		// cpu_input 이 양수이면,
+		else {
+			//kfc_input 값을 cpu_input 의 2배로 초기화.
 			kfc_input = cpu_input * 2;
+
+			//아래 if 문은 무조건 실행됨.
 			if (kfc_input > 0)
+				// kfc_input 값, 즉 cpu_input 값에 2배한 값과 freq_min[CA7] 값 중 큰 값을 kfc_input 에 저장.
 				kfc_input = max(kfc_input, (int)freq_min[CA7]);
 			cpu_input = PM_QOS_CPU_FREQ_MIN_DEFAULT_VALUE;
 
+			// egl_hotplugged 가 false 면
 			if (!egl_hotplugged) {
+				// big_cores_hotplug에 true 값 전달 후 , 리턴값이 true 면 에러
 				if (big_cores_hotplug(true))
 					pr_err("%s: failed big cores hotplug out\n",
 							__func__);
+				// 리턴값이 false 면, egl_hotplugged 를 true 로 바꿈.
 				else
 					egl_hotplugged = true;
 			}
