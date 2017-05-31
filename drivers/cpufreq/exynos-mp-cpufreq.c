@@ -1242,9 +1242,10 @@ static ssize_t store_cpufreq_max_limit(struct kobject *kobj, struct attribute *a
 			kfc_input = cpu_input * 2;
 
 			//아래 if 문은 무조건 실행됨.
-			if (kfc_input > 0)
+			if (kfc_input > 0) {
 				// kfc_input 값, 즉 cpu_input 값에 2배한 값과 freq_min[CA7] 값 중 큰 값을 kfc_input 에 저장.
 				kfc_input = max(kfc_input, (int)freq_min[CA7]);
+			}
 			cpu_input = PM_QOS_CPU_FREQ_MIN_DEFAULT_VALUE;
 
 			// egl_hotplugged 가 false 면
@@ -1256,7 +1257,7 @@ static ssize_t store_cpufreq_max_limit(struct kobject *kobj, struct attribute *a
 				// 리턴값이 false 면, egl_hotplugged 를 true 로 바꿈.
 				else
 					egl_hotplugged = true;
-			}
+			}  
 		}
 	}
 

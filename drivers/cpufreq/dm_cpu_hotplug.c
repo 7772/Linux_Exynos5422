@@ -314,37 +314,39 @@ static struct notifier_block fb_block = {
 	.notifier_call = fb_state_change,
 };
 
-static int __ref __cpu_hotplug(bool out_flag, enum hotplug_cmd cmd)
+static int __ref __cpu_hotplug(bool out_flag, enum hotplug_cmd cmd)  // out_flag 는 true, cmd 는 CMD_BIG_OUT 이 됨.
 {
 	int i = 0;
 	int ret = 0;
 
-	if (exynos_dm_hotplug_disabled())
+	if (exynos_dm_hotplug_disabled())												// exynos_dm_hotplug_disabled 의 리턴이 0 이면 바로 ret 에 0 저장되고 끝. <경우 1>
 		return 0;
 
-#if defined(CONFIG_SCHED_HMP)
-	if (out_flag) {
-		if (do_disable_hotplug)
+#if defined(CONFIG_SCHED_HMP)														// CONFIG_SCHED_HMP 이 정의되어 있는 경우 1, 즉 아래코드 실행
+	if (out_flag) {																				//true 이므로 실행됨.
+		if (do_disable_hotplug)															// do_disable_hotplug 가 true이면 바로 ret=0 리턴. <경우 2>
 			goto blk_out;
 
-		if (cmd == CMD_BIG_OUT && !in_low_power_mode) {
-			for (i = setup_max_cpus - 1; i >= NR_CA7; i--) {
-				if (cpu_online(i)) {
+		if (cmd == CMD_BIG_OUT && !in_low_power_mode) {				// do_disable_hotplug 가 false 일때, cmd == CMD_BIG_OUT (만족) && !in_low_power_mode 이면
+			for (i = setup_max_cpus - 1; i >= NR_CA7; i--) {    // 반복분 실행하고,
+				if (cpu_online(i)) {															// cpu_online(i) 이 true 이면
 					ret = cpu_down(i);
-					if (ret)
-						goto blk_out;
-				}
-			}
-		} else {
-			for (i = setup_max_cpus - 1; i > 0; i--) {
-				if (cpu_online(i)) {
-					ret = cpu_down(i);
-					if (ret)
-						goto blk_out;
+					if (ret)																				// 1이면 return 1 이 됨. -> 원하는 결과가 아님.
+						goto blk_out;																	// 이 if 문을 통과하지 않으면, 즉 ret = cpu_down(i) 에서 0이 저장되는 경우에 return 0 으로 반환됨. <경우 3>
 				}
 			}
 		}
-	} else {
+		else {																							// do_disable_hotplug 가 false 일때, cmd == CMD_BIG_OUT (만족) && in_low_power_mode 일때 실행됨.
+			for (i = setup_max_cpus - 1; i > 0; i--) {
+				if (cpu_online(i)) {
+					ret = cpu_down(i);
+					if (ret)																			// 331~335 와 같은 방식으로 실행됨.
+						goto blk_out;																// 이 if 문을 통과하지 않으면, 즉 ret = cpu_down(i) 에서 0이 저장되는 경우에 return 0 으로 반환됨. <경우 4>
+				}
+			}
+		}
+
+	} else {                      // out_flag 가 false 인 경우 실행.
 		if (in_suspend_prepared)
 			goto blk_out;
 
@@ -401,19 +403,19 @@ static int __ref __cpu_hotplug(bool out_flag, enum hotplug_cmd cmd)
 			}
 		}
 	}
-#else
-	if (out_flag) {
-		if (do_disable_hotplug)
+#else														// CONFIG_SCHED_HMP 이 정의되어 있지 않은 경우 0, 즉 아래코드 실행
+	if (out_flag) {								// 만약 CONFIG_SCHED_HMP 이 정의 되어 있지 않을때는 out_flag 가 0 이므로 아래 코드 실행됨.
+		if (do_disable_hotplug)			// do_disable_hotplug 가 true 이면 ret = 0 반환. <경우 5>
 			goto blk_out;
 
-		for (i = setup_max_cpus - 1; i > 0; i--) {
-			if (cpu_online(i)) {
-				ret = cpu_down(i);
-				if (ret)
+		for (i = setup_max_cpus - 1; i > 0; i--) {		// do_disable_hotplug 가 false 이면 아래 코드 실행.
+			if (cpu_online(i)) {												// cpu_online(i) 이 true 인 경우
+				ret = cpu_down(i);												// cpu_down(i) 을 ret에 저장시키고
+				if (ret)																	// ret 이 1이면 return = 1 .
 					goto blk_out;
-			}
+			}																						// ret 이 0 인 채로 반복문 끝나면, return = 0 임. <경우 6>
 		}
-	} else {
+	} else {																				// out_flag 가 false 인 경우 실행됨.
 		if (in_suspend_prepared)
 			goto blk_out;
 
@@ -431,24 +433,24 @@ blk_out:
 	return ret;
 }
 
-static int dynamic_hotplug(enum hotplug_cmd cmd)
+static int dynamic_hotplug(enum hotplug_cmd cmd)  // 전달되는 인자가 CMD_BIG_OUT 임.
 {
-	int ret = 0;
+	int ret = 0; // 처음의 ret 값은 0
 
-	mutex_lock(&dm_hotplug_lock);
+	mutex_lock(&dm_hotplug_lock);  				//mutex 잠그고
 
-	switch (cmd) {
+	switch (cmd) {												//cmd 의 상태에 따라서 각 case 진행됨.
 	case CMD_LOW_POWER:
 		ret = __cpu_hotplug(true, cmd);
 		in_low_power_mode = true;
 		delay = in_delay;
 		break;
-	case CMD_BIG_OUT:
-		ret = __cpu_hotplug(true, cmd);
+	case CMD_BIG_OUT:												// CMD_BIG_OUT 이 실행됨.
+		ret = __cpu_hotplug(true, cmd);				// ret 값에 __cpu_hotplug(true, CMD_BIG_OUT) 이 전달됨. -> 317번줄
 		break;
 	case CMD_BIG_IN:
 		ret = __cpu_hotplug(false, cmd);
-		break;
+		break;ㅇ
 	case CMD_LITTLE_IN:
 	case CMD_NORMAL:
 		ret = __cpu_hotplug(false, cmd);
@@ -459,7 +461,7 @@ static int dynamic_hotplug(enum hotplug_cmd cmd)
 
 	mutex_unlock(&dm_hotplug_lock);
 
-	return ret;
+	return ret;														// ret 리턴.
 }
 
 static bool force_out_flag;
@@ -487,22 +489,30 @@ void force_dynamic_hotplug(bool out_flag)
 }
 
 #if defined(CONFIG_SCHED_HMP)
+
+// exynos-mp-cpufreq.c 에서 bic_cores_hotplug(true) 가 호출됨.
+// 여기서  out_flag=true 라고 할때,
 int big_cores_hotplug(bool out_flag)
 {
 	int ret = 0;
 
 	mutex_lock(&big_hotplug_lock);
+	// mutex_lock 실행. 뮤텍스가 현재 사용가능하지 않다면 얻을수 있을때 까지 sleep 상태가 됨.
 
+
+	//out_flag 가 true 이면,
 	if (out_flag) {
-		if (big_hotpluged) {
-			big_hotpluged++;
-			goto out;
+		if (big_hotpluged) { //bit_hotpluged 가 1이면
+			big_hotpluged++;   // 1을 더하고
+			goto out;      		 // out으로 이동
 		}
 
-		ret = dynamic_hotplug(CMD_BIG_OUT);
+		ret = dynamic_hotplug(CMD_BIG_OUT); //big_hotpluged 가 1이 아닌 다른 수 이면 ret에 dynamic_hotplug() 를 저장시킴.
+																				//dynamic_hotplug 는 434줄에 위치함. 확인할 것. 총 6가지 경우로 ret 에 0 이 저장 될 수 있음.
 		if (!ret)
 			big_hotpluged++;
-	} else {
+	}
+	else {																						//out_flag 가 false 일때 실행됨.
 		if (WARN_ON(!big_hotpluged)) {
 			pr_err("%s: big cores already hotplug in\n",
 					__func__);
@@ -521,9 +531,23 @@ int big_cores_hotplug(bool out_flag)
 	}
 
 out:
-	mutex_unlock(&big_hotplug_lock);
+	mutex_unlock(&big_hotplug_lock); //  mutex_unlock 해주고,
 
-	return ret;
+//ret의 리턴이 0으로 가면 exynos-mp-cpufreq 에서 egl_hotplugged가 true 가 됨.
+/* 2가지 경우가 존재함
+1) 503번 줄에서 big_hotpluged가 1 이면 big_hotpluged 가 2가 되고, out 으로 이동, 이때의  ret 값은 0 임. 즉 ret=0 이 리턴됨.
+2) 503번 줄에서 big_hotpluged가 1 이 아닌 다른 수 이면, ret에는 dynamic_hotplug(CMD_BIG_OUT) 의 리턴값이 저장된다.
+		여기서 ret 값이 1이 아니면  big_hotpluged++ 해주고 out 으로 오게됨. 즉 ret 이 0 인 경우를 생각하고 있으니, 509 줄 if 문은 실행 될 것임.
+		다시 말해서, 2번째 경우는 dynamic_hotplug() 의 리턴값이 0 일때 big_cores_hotplug의 리턴이 0이 된다는 것.
+
+		dynamic_hotplug(CMD_BIG_OUT) 의 리턴값이 0이 되는 경우를 따져볼 것. -> 434줄
+
+		* 1번 경우
+		* 2번 경우 내에 총 6가지의 다른 경우가 존재함.
+
+		cpu_down(), cpu_online() 의 리턴 값은 kernel/cpu.c 에서 확인 가능함.
+*/
+	return ret;												// ret 을 리턴
 }
 
 static void event_hotplug_in_work(struct work_struct *work)
