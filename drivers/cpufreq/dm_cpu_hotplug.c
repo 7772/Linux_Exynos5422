@@ -328,8 +328,8 @@ static int __ref __cpu_hotplug(bool out_flag, enum hotplug_cmd cmd)  // out_flag
 			goto blk_out;
 
 		if (cmd == CMD_BIG_OUT && !in_low_power_mode) {				// do_disable_hotplug 가 false 일때, cmd == CMD_BIG_OUT (만족) && !in_low_power_mode 이면
-			for (i = setup_max_cpus - 1; i >= NR_CA7; i--) {    // 반복분 실행하고,
-				if (cpu_online(i)) {															// cpu_online(i) 이 true 이면
+			for (i = setup_max_cpus - 1; i >= NR_CA7; i--) {    // 반복분 실행하고, (setup_max_cpus 는 부팅할 cpu 의 최대 개수를 설정해 놓은 변수임.) NR_CA7 은 어떤 변수인지 찾지못함..
+				if (cpu_online(i)) {															// cpu_online(i) 이 true 이면 , (cpu_online, cpu_down 은 kernel/cpu.c에 위치.)
 					ret = cpu_down(i);
 					if (ret)																				// 1이면 return 1 이 됨. -> 원하는 결과가 아님.
 						goto blk_out;																	// 이 if 문을 통과하지 않으면, 즉 ret = cpu_down(i) 에서 0이 저장되는 경우에 return 0 으로 반환됨. <경우 3>
